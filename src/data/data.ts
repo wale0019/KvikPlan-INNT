@@ -5,6 +5,10 @@ export type Booking = {
   carSize: string;
   waterUsage: number;
   completed: boolean;
+
+  name?: string;
+  phone?: string;
+  address?: string;
 };
 
 export const VAN_CAPACITY = 150;

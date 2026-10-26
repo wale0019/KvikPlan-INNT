@@ -1,10 +1,10 @@
 import { router } from "expo-router";
+import { Alert, FlatList, Pressable, Text, View } from "react-native";
 
-import { FlatList, Pressable, Text, View } from "react-native";
-
-import { styles } from "../styles/styles";
-import { VAN_CAPACITY } from "../data/data";
 import { useBookings } from "../context/BookingContext";
+import { VAN_CAPACITY } from "../data/data";
+import { adminStyles } from "../styles/adminStyles";
+import { styles } from "../styles/styles";
 
 export default function AdminScreen() {
   const {
@@ -14,6 +14,7 @@ export default function AdminScreen() {
     refillSlots,
     refillWater,
     resetDemo,
+    deleteBooking,
   } = useBookings();
 
   const waterPercentage = Math.round((currentWater / VAN_CAPACITY) * 100);
@@ -30,72 +31,136 @@ export default function AdminScreen() {
     return "God";
   };
 
+  const handleDeleteBooking = (id: string, time: string) => {
+    Alert.alert("Slet booking", `Vil du slette bookingen kl. ${time}?`, [
+      {
+        text: "Annuller",
+        style: "cancel",
+      },
+      {
+        text: "Slet",
+        style: "destructive",
+
+        onPress: async () => {
+          const deleted = await deleteBooking(id);
+
+          if (!deleted) {
+            Alert.alert("Kunne ikke slette booking", "Prøv igen.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const sortedBookings = [...bookings].sort((a, b) => {
+    const [aHour, aMinute] = a.time.split(":").map(Number);
+
+    const [bHour, bMinute] = b.time.split(":").map(Number);
+
+    return aHour * 60 + aMinute - (bHour * 60 + bMinute);
+  });
+
   return (
     <View style={styles.screen}>
       <Text style={styles.pageTitle}>Admin</Text>
 
       <Text style={styles.pageSubtitle}>Dagens overblik</Text>
 
-      <View style={styles.waterCard}>
-        <Text style={styles.adminSectionTitle}>Aktuel vandstatus</Text>
+      <View style={adminStyles.waterCard}>
+        <Text style={adminStyles.adminSectionTitle}>Aktuel vandstatus</Text>
 
-        <Text style={styles.waterAmount}>{currentWater} L</Text>
+        <Text style={adminStyles.waterAmount}>{currentWater} L</Text>
 
-        <Text style={styles.waterCapacityText}>af {VAN_CAPACITY} L</Text>
+        <Text style={adminStyles.waterCapacityText}>af {VAN_CAPACITY} L</Text>
 
-        <Text style={styles.waterStatusText}>Status: {getWaterStatus()}</Text>
+        <Text style={adminStyles.waterStatusText}>
+          Status: {getWaterStatus()}
+        </Text>
 
-        <Text style={styles.waterPercentage}>{waterPercentage}% tilbage</Text>
+        <Text style={adminStyles.waterPercentage}>
+          {waterPercentage}% tilbage
+        </Text>
 
-        <Text style={styles.bookingInfo}>
+        <Text style={adminStyles.bookingInfo}>
           Forventet vand tilbage efter kommende bookinger: {projectedWater} L
         </Text>
 
         {refillSlots.length > 0 && (
-          <Text style={styles.bookingInfo}>
+          <Text style={adminStyles.bookingInfo}>
             Planlagt genopfyldning: {refillSlots.join(", ")}
           </Text>
         )}
 
-        <Pressable style={styles.refillButton} onPress={refillWater}>
-          <Text style={styles.refillButtonText}>Registrer genopfyldning</Text>
+        <Pressable style={adminStyles.refillButton} onPress={refillWater}>
+          <Text style={adminStyles.refillButtonText}>
+            Registrer genopfyldning
+          </Text>
         </Pressable>
       </View>
 
-      <Text style={styles.adminSectionTitle}>Dagens bookinger</Text>
+      <Text style={adminStyles.adminSectionTitle}>Dagens bookinger</Text>
 
       <FlatList
-        data={bookings}
+        data={sortedBookings}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.bookingCard}>
-            <View style={styles.bookingLeft}>
-              <Text style={styles.bookingTime}>{item.time}</Text>
+          <View style={adminStyles.bookingCard}>
+            <View style={adminStyles.bookingLeft}>
+              <Text style={adminStyles.bookingTime}>{item.time}</Text>
 
-              <Text style={styles.bookingInfo}>
+              <Text style={adminStyles.bookingInfo}>
                 {item.service} · {item.carSize} bil
               </Text>
 
+              {item.name ? (
+                <>
+                  <Text style={adminStyles.bookingInfo}>
+                    Kunde: {item.name}
+                  </Text>
+
+                  <Text style={adminStyles.bookingInfo}>
+                    Adresse: {item.address}
+                  </Text>
+
+                  <Text style={adminStyles.bookingInfo}>
+                    Tlf.: {item.phone}
+                  </Text>
+                </>
+              ) : null}
+
               <View
                 style={[
-                  styles.statusBadge,
-                  item.completed ? styles.completedBadge : styles.upcomingBadge,
+                  adminStyles.statusBadge,
+
+                  item.completed
+                    ? adminStyles.completedBadge
+                    : adminStyles.upcomingBadge,
                 ]}
               >
                 <Text
                   style={[
-                    styles.statusBadgeText,
+                    adminStyles.statusBadgeText,
+
                     item.completed
-                      ? styles.completedBadgeText
-                      : styles.upcomingBadgeText,
+                      ? adminStyles.completedBadgeText
+                      : adminStyles.upcomingBadgeText,
                   ]}
                 >
                   {item.completed ? "Gennemført" : "Kommende"}
                 </Text>
               </View>
+
+              {!item.completed && item.name ? (
+                <Pressable
+                  style={adminStyles.deleteButton}
+                  onPress={() => handleDeleteBooking(item.id, item.time)}
+                >
+                  <Text style={adminStyles.deleteButtonText}>Slet booking</Text>
+                </Pressable>
+              ) : null}
             </View>
 
-            <Text style={styles.bookingWater}>{item.waterUsage} L</Text>
+            <Text style={adminStyles.bookingWater}>{item.waterUsage} L</Text>
           </View>
         )}
       />

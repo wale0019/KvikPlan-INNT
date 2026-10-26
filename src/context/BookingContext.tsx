@@ -1,4 +1,10 @@
-import { createContext, ReactNode, useContext, useState } from "react";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 import {
   Booking,
@@ -8,11 +14,27 @@ import {
   VAN_CAPACITY,
 } from "../data/data";
 
+import {
+  deleteAllFirebaseBookings,
+  deleteBookingFromFirestore,
+  saveBookingToFirestore,
+  subscribeToBookings,
+} from "../firebase/bookingService";
+
 type NewBooking = {
   time: string;
   service: string;
   carSize: string;
   waterUsage: number;
+  name: string;
+  phone: string;
+  address: string;
+};
+
+export type CustomerDetails = {
+  name: string;
+  phone: string;
+  address: string;
 };
 
 type BookingContextType = {
@@ -21,14 +43,26 @@ type BookingContextType = {
   projectedWater: number;
   refillSlots: string[];
 
-  addBooking: (booking: NewBooking) => boolean;
+  customerDetails: CustomerDetails;
+  setCustomerDetails: (details: CustomerDetails) => void;
+  clearCustomerDetails: () => void;
+
+  addBooking: (booking: NewBooking) => Promise<boolean>;
+  deleteBooking: (bookingId: string) => Promise<boolean>;
+
   refillWater: () => void;
-  resetDemo: () => void;
+  resetDemo: () => Promise<void>;
 
   isTimeAvailable: (time: string, waterUsage: number) => boolean;
 };
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
+
+const EMPTY_CUSTOMER_DETAILS: CustomerDetails = {
+  name: "",
+  phone: "",
+  address: "",
+};
 
 const INITIAL_WATER =
   VAN_CAPACITY -
@@ -74,6 +108,7 @@ function simulateSchedule(bookings: Booking[], currentWater: number) {
       }
 
       water -= booking.waterUsage;
+
       continue;
     }
 
@@ -110,6 +145,25 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   const [currentWater, setCurrentWater] = useState(INITIAL_WATER);
 
+  const [customerDetails, setCustomerDetails] = useState<CustomerDetails>(
+    EMPTY_CUSTOMER_DETAILS,
+  );
+
+  useEffect(() => {
+    const unsubscribe = subscribeToBookings((firebaseBookings) => {
+      const initialBookingsWithoutConflicts = INITIAL_BOOKINGS.filter(
+        (initialBooking) =>
+          !firebaseBookings.some(
+            (firebaseBooking) => firebaseBooking.time === initialBooking.time,
+          ),
+      );
+
+      setBookings([...initialBookingsWithoutConflicts, ...firebaseBookings]);
+    });
+
+    return unsubscribe;
+  }, []);
+
   const schedule = simulateSchedule(bookings, currentWater);
 
   const isTimeAvailable = (time: string, waterUsage: number) => {
@@ -143,29 +197,76 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     return testResult.valid;
   };
 
-  const addBooking = (newBooking: NewBooking) => {
+  const addBooking = async (newBooking: NewBooking) => {
     if (!isTimeAvailable(newBooking.time, newBooking.waterUsage)) {
       return false;
     }
 
-    const booking: Booking = {
-      ...newBooking,
-      id: Date.now().toString(),
-      completed: false,
-    };
+    try {
+      const id = await saveBookingToFirestore(newBooking);
 
-    setBookings((currentBookings) => [...currentBookings, booking]);
+      const booking: Booking = {
+        ...newBooking,
+        id,
+        completed: false,
+      };
 
-    return true;
+      setBookings((currentBookings) => {
+        const alreadyExists = currentBookings.some(
+          (currentBooking) =>
+            currentBooking.id === booking.id ||
+            currentBooking.time === booking.time,
+        );
+
+        if (alreadyExists) {
+          return currentBookings;
+        }
+
+        return [...currentBookings, booking];
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Kunne ikke gemme booking:", error);
+
+      return false;
+    }
+  };
+
+  const deleteBooking = async (bookingId: string) => {
+    try {
+      await deleteBookingFromFirestore(bookingId);
+
+      setBookings((currentBookings) =>
+        currentBookings.filter((booking) => booking.id !== bookingId),
+      );
+
+      return true;
+    } catch (error) {
+      console.error("Kunne ikke slette booking:", error);
+
+      return false;
+    }
   };
 
   const refillWater = () => {
     setCurrentWater(VAN_CAPACITY);
   };
 
-  const resetDemo = () => {
-    setBookings(INITIAL_BOOKINGS);
-    setCurrentWater(INITIAL_WATER);
+  const clearCustomerDetails = () => {
+    setCustomerDetails(EMPTY_CUSTOMER_DETAILS);
+  };
+
+  const resetDemo = async () => {
+    try {
+      await deleteAllFirebaseBookings();
+
+      setBookings(INITIAL_BOOKINGS);
+      setCurrentWater(INITIAL_WATER);
+      clearCustomerDetails();
+    } catch (error) {
+      console.error("Kunne ikke nulstille demo:", error);
+    }
   };
 
   return (
@@ -176,7 +277,12 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         projectedWater: schedule.waterLeft,
         refillSlots: schedule.refillSlots,
 
+        customerDetails,
+        setCustomerDetails,
+        clearCustomerDetails,
+
         addBooking,
+        deleteBooking,
         refillWater,
         resetDemo,
         isTimeAvailable,

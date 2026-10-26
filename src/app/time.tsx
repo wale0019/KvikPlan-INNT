@@ -1,12 +1,9 @@
 import { router, useLocalSearchParams } from "expo-router";
-
 import { FlatList, Pressable, Text, View } from "react-native";
 
-import { styles } from "../styles/styles";
-
-import { TIME_SLOTS, WATER_USAGE } from "../data/data";
-
 import { useBookings } from "../context/BookingContext";
+import { TIME_SLOTS, WATER_USAGE } from "../data/data";
+import { styles } from "../styles/styles";
 
 export default function TimeScreen() {
   const { service, carSize } = useLocalSearchParams<{
@@ -14,7 +11,7 @@ export default function TimeScreen() {
     carSize?: string;
   }>();
 
-  const { bookings, addBooking, isTimeAvailable, refillSlots } = useBookings();
+  const { bookings, isTimeAvailable, refillSlots } = useBookings();
 
   const selectedService = service ?? "";
   const selectedCarSize = carSize ?? "";
@@ -69,19 +66,8 @@ export default function TimeScreen() {
   });
 
   const chooseTime = (time: string) => {
-    const bookingAdded = addBooking({
-      time,
-      service: selectedService,
-      carSize: selectedCarSize,
-      waterUsage: estimatedWater,
-    });
-
-    if (!bookingAdded) {
-      return;
-    }
-
     router.push({
-      pathname: "/confirmation",
+      pathname: "/customer-details",
 
       params: {
         service: selectedService,
@@ -113,7 +99,6 @@ export default function TimeScreen() {
             onPress={() => chooseTime(item.time)}
             style={[
               styles.timeCard,
-
               !item.available && styles.timeCardUnavailable,
             ]}
           >
@@ -122,7 +107,6 @@ export default function TimeScreen() {
             <Text
               style={[
                 styles.timeStatus,
-
                 !item.available && styles.timeStatusUnavailable,
               ]}
             >

@@ -1,14 +1,19 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, Text, View } from "react-native";
+
 import { styles } from "../styles/styles";
 
 export default function ConfirmationScreen() {
-  const { service, carSize, time, estimatedWater } = useLocalSearchParams<{
-    service: string;
-    carSize: string;
-    time: string;
-    estimatedWater: string;
-  }>();
+  const { service, carSize, time, estimatedWater, name, phone, address } =
+    useLocalSearchParams<{
+      service?: string;
+      carSize?: string;
+      time?: string;
+      estimatedWater?: string;
+      name?: string;
+      phone?: string;
+      address?: string;
+    }>();
 
   return (
     <View style={styles.screen}>
@@ -17,6 +22,15 @@ export default function ConfirmationScreen() {
       <Text style={styles.pageTitle}>Booking bekræftet</Text>
 
       <View style={styles.summaryCard}>
+        <Text style={styles.summaryLabel}>Navn</Text>
+        <Text style={styles.summaryValue}>{name}</Text>
+
+        <Text style={styles.summaryLabel}>Telefonnummer</Text>
+        <Text style={styles.summaryValue}>{phone}</Text>
+
+        <Text style={styles.summaryLabel}>Adresse</Text>
+        <Text style={styles.summaryValue}>{address}</Text>
+
         <Text style={styles.summaryLabel}>Servicepakke</Text>
         <Text style={styles.summaryValue}>{service}</Text>
 
